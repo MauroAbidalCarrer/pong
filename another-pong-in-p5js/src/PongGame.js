@@ -1,7 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ReactP5Wrapper } from "@p5-wrapper/react";
+import io from 'socket.io-client'; // Import the socket.io client
 
-export default function PongGame() {
+export default function PongGame() { 
+    const [socket, setSocket] = useState(null); // Store the socket connection
+    const [connectionStatus, setConnectionStatus] = useState('Connecting...'); // Store connection status
+
+    // Connect to the socket server on component mount
+    useEffect(() => {
+        const newSocket = io.connect('http://localhost:3000'); // Replace with your server address
+
+        newSocket.on('connect', () => setConnectionStatus('Connected'));
+        newSocket.on('connect_error', () => setConnectionStatus('Connection failed'));
+        newSocket.on('connect_timeout', () => setConnectionStatus('Connection timeout'));
+
+        setSocket(newSocket);
+        return () => newSocket.close(); // Disconnect on unmount
+    }, []);
+
     const sketch = p5 => {
         const canvasWidth = 800;
         const canvasHeight = 600;
@@ -108,6 +124,18 @@ export default function PongGame() {
             playerRight = new Player(canvasWidth - playerOffset - playerWidth);
             ball = new Ball();
             console.log('setup called')
+            socket.on('gameState', (gameState) => {
+                playerLeft.pos.y = gameState.playerLeft.y;
+                playerRight.pos.y = gameState.playerRight.y;
+                ball.pos.x = gameState.ball.x;
+                ball.pos.y = gameState.ball.y;
+            });
+
+            // When a point is scored, update the players' scores
+            socket.on('score', (scores) => {
+                playerLeft.points = scores.left;
+                playerRight.points = scores.right;
+            });
         };
 
         p5.draw = () => {
@@ -120,9 +148,18 @@ export default function PongGame() {
             playerLeft.move(p5.UP_ARROW, p5.DOWN_ARROW);
             playerRight.move(87, 83);
             ball.move();
+            // Send the current player's direction to the server
+            let direction = 0;
+            if (p5.keyIsDown(p5.UP_ARROW)) direction = -1;
+            if (p5.keyIsDown(p5.DOWN_ARROW)) direction = 1;
+            socket.emit('playerAction', { direction });
         };
 
     };
 
-    return <ReactP5Wrapper sketch={sketch} />;
+    return (
+        connectionStatus === 'Connected'
+            ? <ReactP5Wrapper sketch={sketch} />
+            : <p>{connectionStatus}</p>
+    );
 }
