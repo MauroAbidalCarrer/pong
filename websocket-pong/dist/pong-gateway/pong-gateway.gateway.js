@@ -74,6 +74,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PongGateway.prototype, "handlePlayerMove", null);
 exports.PongGateway = PongGateway = __decorate([
-    (0, websockets_1.WebSocketGateway)(3000)
+    (0, websockets_1.WebSocketGateway)(8080)
 ], PongGateway);
 //# sourceMappingURL=pong-gateway.gateway.js.map

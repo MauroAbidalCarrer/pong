@@ -8,7 +8,7 @@ export default function PongGame() {
 
     // Connect to the socket server on component mount
     useEffect(() => {
-        const newSocket = io.connect('http://localhost:3000'); // Replace with your server address
+        const newSocket = io.connect('http://localhost:8080'); // Replace with your server address
 
         newSocket.on('connect', () => setConnectionStatus('Connected'));
         newSocket.on('connect_error', () => setConnectionStatus('Connection failed'));

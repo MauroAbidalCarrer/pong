@@ -22,7 +22,7 @@ type GameState = {
   players: [Player, Player];
 };
 
-@WebSocketGateway(3000)
+@WebSocketGateway(8080)
 export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
