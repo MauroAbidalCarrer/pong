@@ -32,15 +32,12 @@ export default function PongGame() {
         let playerRight;
         let ball;
 
-        // function clamp(num, min, max){
-        // return Math.max(Math.min(num, max), min)
-        // }
         class Player{
             constructor(x)
             {
                 this.pos = p5.createVector(x, canvasHeight / 2)
                 this.points = 0
-                console.log('Player constructed')
+                this.won = false
             }
             
             draw(isLocal)
@@ -100,6 +97,8 @@ export default function PongGame() {
                 ball.pos.y = gameState.ball.pos.y;
                 playerLeft.points = gameState.players[0].points
                 playerRight.points = gameState.players[1].points
+                playerRight.won = gameState.players[0].won
+                playerLeft.won = gameState.players[1].won
             });
 
             // When a point is scored, update the players' scores
@@ -109,12 +108,12 @@ export default function PongGame() {
             });
         };
 
-        p5.draw = () => {
+        function drawGame() {
             p5.background(220);
             playerLeft.draw(playerIndex === 0);
             playerRight.draw(playerIndex === 1);
             ball.draw();
-
+ 
             if (playerIndex === 0)
                 playerLeft.move(p5.UP_ARROW, p5.DOWN_ARROW);
             if (playerIndex === 1)
@@ -124,6 +123,26 @@ export default function PongGame() {
             p5.fill('black')
             p5.text(playerLeft.points.toString(), canvasWidth / 5, canvasHeight / 6)
             p5.text(playerRight.points.toString(), canvasWidth - canvasWidth / 5, canvasHeight / 6)
+
+            console.log("Draw called")
+        }
+        function drawEndMenu() {
+            p5.clear()
+            p5.textSize(150);
+            if ((playerLeft.won && playerIndex === 0) || (playerRight.won && playerIndex === 1)) {
+                p5.fill('yellow')
+                p5.text("VICTORY!", canvasWidth / 5, canvasHeight / 6)
+            }
+            else if ((playerLeft.won && playerIndex === 1) || (playerRight.won && playerIndex === 0)) {
+                p5.fill('gray')
+                p5.text("DEFEAT!", canvasWidth / 10, canvasHeight / 10, canvasWidth * 0.9 , canvasHeight * 0.9)
+            }
+        }
+        p5.draw = () => {
+            if (playerLeft.points >= 3 || playerRight.points >= 3)
+                drawEndMenu()
+            else
+                drawGame()
         };
 
     };

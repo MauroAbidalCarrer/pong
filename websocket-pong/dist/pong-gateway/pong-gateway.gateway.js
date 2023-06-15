@@ -59,11 +59,9 @@ class Ball {
         if (this.pos.y > canvasHeight - ballRadius || this.pos.y < ballRadius)
             this.verticalMovement *= -1;
         if (this.pos.x > canvasWidth - ballRadius) {
-            console.log("giving point to left player.");
             this.givepointToPlayer(gameState.players[0]);
         }
         if (this.pos.x < ballRadius) {
-            console.log("giving point to right player.");
             this.givepointToPlayer(gameState.players[1]);
         }
     }
@@ -73,8 +71,8 @@ let PongGateway = exports.PongGateway = class PongGateway {
         this.gameState = {
             ball: new Ball(),
             players: [
-                { y: 0, socketId: 0, points: 0 },
-                { y: 0, socketId: 0, points: 0 },
+                { y: 0, socketId: 0, points: 0, won: false },
+                { y: 0, socketId: 0, points: 0, won: false },
             ],
         };
         this.clientSockets = [];
@@ -89,14 +87,11 @@ let PongGateway = exports.PongGateway = class PongGateway {
     }
     handleDisconnect(clientSocket) {
         console.log('clientSocket disconnected:', clientSocket.id);
+        if (this.clientSockets.length === 2 && !this.gameState.players.some(player => player.won)) {
+            let disconnectedPlayerIndex = this.clientSockets.findIndex(cs => clientSocket === cs);
+            this.gameState.players[1 - disconnectedPlayerIndex].won = true;
+        }
         this.clientSockets = this.clientSockets.filter((c) => c.id !== clientSocket.id);
-        this.gameState = {
-            ball: new Ball(),
-            players: [
-                { y: 300, socketId: 0, points: 0 },
-                { y: 300, socketId: 0, points: 0 },
-            ],
-        };
     }
     startGame() {
         this.server.emit('update-game', this.gameState);

@@ -26,6 +26,7 @@ type Player = {
   socketId: number
   y: number
   points: number
+  won: boolean
 };
 
 type GameState = {
@@ -97,8 +98,8 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
   gameState: GameState = {
     ball: new Ball(),
     players: [
-      { y: 0, socketId: 0, points: 0 }, // Player 1
-      { y: 0, socketId: 0, points: 0 }, // Player 2
+      { y: 0, socketId: 0, points: 0, won: false }, // Player 1
+      { y: 0, socketId: 0, points: 0, won: false }, // Player 2
     ],
   };
 
@@ -119,18 +120,13 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(clientSocket: Socket) {
     console.log('clientSocket disconnected:', clientSocket.id);
-
+    if (this.clientSockets.length === 2 && !this.gameState.players.some(player => player.won)) { 
+      let disconnectedPlayerIndex = this.clientSockets.findIndex(cs => clientSocket === cs)
+      this.gameState.players[1 - disconnectedPlayerIndex].won = true
+    }
     // Remove disconnected clientSocket from the list of clientSockets
     this.clientSockets = this.clientSockets.filter((c) => c.id !== clientSocket.id);
-
     // Reset the game state
-    this.gameState = {
-      ball: new Ball(),
-      players: [
-        { y: 300, socketId: 0, points: 0 }, // leftPlayer
-        { y: 300, socketId: 0, points: 0 }, // rightPlayer
-      ],
-    };
   }
 
   // Method to start the game

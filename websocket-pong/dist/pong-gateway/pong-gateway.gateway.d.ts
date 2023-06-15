@@ -5,6 +5,7 @@ type Player = {
     socketId: number;
     y: number;
     points: number;
+    won: boolean;
 };
 type GameState = {
     ball: Ball;
