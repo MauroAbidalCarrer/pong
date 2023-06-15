@@ -81,45 +81,6 @@ export default function PongGame() {
                 // console.log(this.pos)
                 p5.circle(this.pos.x, this.pos.y, ballRadius * 2)
             }
-            // checkOverlap(player) {
-            //     // Find the closest point to the circle within the rectangle
-            //     let closestX = clamp(this.pos.x - player.pos.x,-playerWidth / 2, playerWidth / 2) + player.pos.x
-            //     let closestY = clamp(this.pos.y - player.pos.y, -playerHeight / 2, playerHeight / 2) + player.pos.y
-            //     // Calculate the distance between the circle's center and the closest point
-            //     var distanceX = this.pos.x - closestX;
-            //     var distanceY = this.pos.y - closestY;
-            //     var distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
-            //     // Check if the distance is less than the circle's radius squared
-            //     return distanceSquared <= (ballRadius * ballRadius);
-            // }
-            // bounceOffPlayer(player) {
-            //     let dir = p5.createVector(this.pos.x - player.pos.x, this.pos.y - player.pos.y);
-            //     dir.normalize();
-            //     this.horizontalMovement *= -1;
-            //     this.verticalMovement = dir.y * 90;
-            // }            
-            // givepointToPlayer(player){
-            //     this.pos = p5.createVector(canvasWidth / 2, canvasHeight / 2)
-            //     player.points++
-            //     //console.log(player.points)
-            // }
-            // move() {
-            //     this.pos.x += this.horizontalMovement * canvasWidth * (p5.deltaTime / 1000)
-            //     this.pos.y += this.verticalMovement * (p5.deltaTime / 1000)
-            //     //bounce off players
-            //     if (this.checkOverlap(playerLeft) && this.horizontalMovement === -1)
-            //     this.bounceOffPlayer(playerLeft)
-            //     if (this.checkOverlap(playerRight) && this.horizontalMovement === 1)
-            //     this.bounceOffPlayer(playerRight)
-            //     //bounce off walls
-            //     if (this.pos.y > canvasHeight - ballRadius || this.pos.y < ballRadius){
-            //     this.verticalMovement *= -1
-            //     }
-            //     if (this.pos.x > canvasWidth - ballRadius)
-            //     this.givepointToPlayer(playerLeft)
-            //     if (this.pos.x < ballRadius)
-            //     this.givepointToPlayer(playerRight)
-            // }
         }
 
         p5.setup = () => {
@@ -137,6 +98,8 @@ export default function PongGame() {
                     playerRight.pos.y = gameState.players[1].y;
                 ball.pos.x = gameState.ball.pos.x;
                 ball.pos.y = gameState.ball.pos.y;
+                playerLeft.points = gameState.players[0].points
+                playerRight.points = gameState.players[1].points
             });
 
             // When a point is scored, update the players' scores
@@ -156,7 +119,11 @@ export default function PongGame() {
                 playerLeft.move(p5.UP_ARROW, p5.DOWN_ARROW);
             if (playerIndex === 1)
                 playerRight.move(87, 83);
-            // ball.move();
+
+            p5.textSize(32);
+            p5.fill('black')
+            p5.text(playerLeft.points.toString(), canvasWidth / 5, canvasHeight / 6)
+            p5.text(playerRight.points.toString(), canvasWidth - canvasWidth / 5, canvasHeight / 6)
         };
 
     };

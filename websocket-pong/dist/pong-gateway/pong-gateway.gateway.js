@@ -45,7 +45,6 @@ class Ball {
     }
     givepointToPlayer(player) {
         this.pos = new simpleMath_1.Vector2D(canvasWidth / 2, canvasHeight / 2);
-        console.log("ball pos reset: ", this.pos);
         player.points++;
     }
     move(gameState) {

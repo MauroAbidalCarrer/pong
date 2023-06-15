@@ -58,9 +58,8 @@ class Ball{
   }            
   givepointToPlayer(player: Player){
     this.pos = new Vector2D(canvasWidth / 2, canvasHeight / 2)
-    console.log("ball pos reset: ", this.pos)
+    // console.log("ball pos reset: ", this.pos)
     player.points++
-    //console.log(player.points)
   }
   move(gameState: GameState) {
     // console.log("pos before moving: ", this.pos)
@@ -78,11 +77,11 @@ class Ball{
     if (this.pos.y > canvasHeight - ballRadius || this.pos.y < ballRadius)
       this.verticalMovement *= -1
     if (this.pos.x > canvasWidth - ballRadius) {
-      console.log("giving point to left player.")
+      // console.log("giving point to left player.")
       this.givepointToPlayer(gameState.players[0])
     }
     if (this.pos.x < ballRadius) {
-      console.log("giving point to right player.")
+      // console.log("giving point to right player.")
       this.givepointToPlayer(gameState.players[1])
     }
     // console.log()
