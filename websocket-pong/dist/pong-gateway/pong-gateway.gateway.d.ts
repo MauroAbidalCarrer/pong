@@ -1,18 +1,24 @@
 import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
+import { Vector2D } from './simpleMath';
 type Player = {
     socketId: number;
     y: number;
+    points: number;
 };
 type GameState = {
-    ball: {
-        x: number;
-        y: number;
-        directionX: number;
-        directionY: number;
-    };
+    ball: Ball;
     players: [Player, Player];
 };
+declare class Ball {
+    pos: Vector2D;
+    horizontalMovement: number;
+    verticalMovement: number;
+    checkOverlap(playerPos: Vector2D): boolean;
+    bounceOffPlayer(playerPos: Vector2D): void;
+    givepointToPlayer(player: Player): void;
+    move(gameState: GameState): void;
+}
 export declare class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
     server: Server;
     gameState: GameState;

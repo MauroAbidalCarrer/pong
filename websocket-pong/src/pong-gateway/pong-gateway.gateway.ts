@@ -6,22 +6,88 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
+import { clamp, Vector2D } from './simpleMath';
+
+//const
+const canvasWidth = 800;
+const canvasHeight = 600;
+const playerWidth = 30;
+const playerOffset = 10;
+const playerHeight = 100;
+const leftPlayerX = playerOffset + playerWidth
+const rightPlayerX = canvasWidth - playerOffset - playerWidth
+const ballRadius = 15;
+const interval: number = 1000 / 30
+const deltaTime: number = 1 / 30
+
 
 // Define the GameState and Player type
 type Player = {
   socketId: number
-  y: number;
+  y: number
+  points: number
 };
 
 type GameState = {
-  ball: {
-    x: number;
-    y: number;
-    directionX: number;
-    directionY: number;
-  };
+  ball: Ball
   players: [Player, Player];
 };
+
+
+class Ball{
+  pos: Vector2D = new Vector2D(0, 0)
+  horizontalMovement: number = 1
+  verticalMovement: number = 0
+  checkOverlap(playerPos: Vector2D): boolean {
+      // Find the closest point to the circle within the rectangle
+      let closestX = clamp(this.pos.x - playerPos.x,-playerWidth / 2, playerWidth / 2) + playerPos.x
+      let closestY = clamp(this.pos.y - playerPos.y, -playerHeight / 2, playerHeight / 2) + playerPos.y
+      // Calculate the distance between the circle's center and the closest point
+      var distanceX = this.pos.x - closestX;
+      var distanceY = this.pos.y - closestY;
+      var distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+      // Check if the distance is less than the circle's radius squared
+      return distanceSquared <= (ballRadius * ballRadius);
+  }
+  bounceOffPlayer(playerPos: Vector2D) {
+      let dir = new Vector2D(this.pos.x - playerPos.x, this.pos.y - playerPos.y);
+      
+      dir.normalize();
+      this.horizontalMovement *= -1;
+      this.verticalMovement = dir.y * 90;
+  }            
+  givepointToPlayer(player: Player){
+    this.pos = new Vector2D(canvasWidth / 2, canvasHeight / 2)
+    console.log("ball pos reset: ", this.pos)
+    player.points++
+    //console.log(player.points)
+  }
+  move(gameState: GameState) {
+    // console.log("pos before moving: ", this.pos)
+    this.pos.x += this.horizontalMovement * canvasWidth * deltaTime
+    this.pos.y += this.verticalMovement * deltaTime
+    // console.log("pos after moving: ", this.pos)
+    //bounce off players
+    let leftPlayerPos: Vector2D = new Vector2D(leftPlayerX, gameState.players[0].y)
+    if (this.checkOverlap(leftPlayerPos) && this.horizontalMovement === -1)
+      this.bounceOffPlayer(leftPlayerPos)
+    let rightPlayerPos: Vector2D = new Vector2D(rightPlayerX, gameState.players[1].y)
+    if (this.checkOverlap(rightPlayerPos) && this.horizontalMovement === 1)
+      this.bounceOffPlayer(rightPlayerPos)
+    //bounce off walls
+    if (this.pos.y > canvasHeight - ballRadius || this.pos.y < ballRadius)
+      this.verticalMovement *= -1
+    if (this.pos.x > canvasWidth - ballRadius) {
+      console.log("giving point to left player.")
+      this.givepointToPlayer(gameState.players[0])
+    }
+    if (this.pos.x < ballRadius) {
+      console.log("giving point to right player.")
+      this.givepointToPlayer(gameState.players[1])
+    }
+    // console.log()
+  }
+}
 
 @WebSocketGateway(8080)
 export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -30,15 +96,10 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Initial game state
   gameState: GameState = {
-    ball: {
-      x: 0,
-      y: 0,
-      directionX: 1,
-      directionY: 0,
-    },
+    ball: new Ball(),
     players: [
-      { y: 0, socketId: 0 }, // Player 1
-      { y: 0, socketId: 0 }, // Player 2
+      { y: 0, socketId: 0, points: 0 }, // Player 1
+      { y: 0, socketId: 0, points: 0 }, // Player 2
     ],
   };
 
@@ -65,15 +126,10 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Reset the game state
     this.gameState = {
-      ball: {
-        x: 400,
-        y: 300,
-        directionX: 1,
-        directionY: 0,
-      },
+      ball: new Ball(),
       players: [
-        { y: 300, socketId: 0 }, // Player 1
-        { y: 300, socketId: 0 }, // Player 2
+        { y: 300, socketId: 0, points: 0 }, // leftPlayer
+        { y: 300, socketId: 0, points: 0 }, // rightPlayer
       ],
     };
   }
@@ -90,6 +146,12 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // Send game state to both clientSockets
     this.server.emit('update-game', this.gameState);
+    //update
+    setInterval(() => {
+      this.gameState.ball.move(this.gameState)
+      this.server.emit('update-game', this.gameState);
+    }, interval);
+
   }
 
   // Method to handle player move events
@@ -100,8 +162,8 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Update the player's position based on the payload
     this.gameState.players[playerIndex].y = payload.y;
 
-    console.log(`Received player-move event of player ${playerIndex}, p1 pos:${this.gameState.players[0].y}, p2 pos:${this.gameState.players[1].y}, payload.y: ${payload.y}`)
+    // console.log(`Received player-move event of player ${playerIndex}, p1 pos:${this.gameState.players[0].y}, p2 pos:${this.gameState.players[1].y}, payload.y: ${payload.y}`)
     // Then emit the updated game state to both clientSockets
-    this.server.emit('update-game', this.gameState);
+    // this.server.emit('update-game', this.gameState);
   }
 }
