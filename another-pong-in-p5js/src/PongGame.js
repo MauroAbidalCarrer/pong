@@ -5,6 +5,7 @@ import io from 'socket.io-client'; // Import the socket.io client
 export default function PongGame() { 
     const [socket, setSocket] = useState(null); // Store the socket connection
     const [connectionStatus, setConnectionStatus] = useState('Connecting...'); // Store connection status
+    const [playerIndex, setPlayerIndex] = useState(null); // Store the player index, 0 = left, 1 = right
 
     // Connect to the socket server on component mount
     useEffect(() => {
@@ -13,6 +14,7 @@ export default function PongGame() {
         newSocket.on('connect', () => setConnectionStatus('Connected'));
         newSocket.on('connect_error', () => setConnectionStatus('Connection failed'));
         newSocket.on('connect_timeout', () => setConnectionStatus('Connection timeout'));
+        newSocket.on('assign-player', (playerIndex) => setPlayerIndex(playerIndex));
 
         setSocket(newSocket);
         return () => newSocket.close(); // Disconnect on unmount
@@ -41,9 +43,10 @@ export default function PongGame() {
                 console.log('Player constructed')
             }
             
-            draw()
+            draw(isLocal)
             {
                 p5.rectMode(p5.CENTER)
+                p5.fill(isLocal ? 'blue' : 'red')
                 p5.rect(this.pos.x, this.pos.y, playerWidth, playerHeight)
                 p5.rectMode(p5.CORNER)
             }
@@ -57,11 +60,13 @@ export default function PongGame() {
                 direction = 1
                 //move
                 this.pos.y += direction * canvasHeight * 0.5 * (p5.deltaTime / 1000)
-                //clampthe position
+                //clamp the position
                 this.pos.y = Math.max(this.pos.y, playerHeight / 2)
                 this.pos.y = Math.min(this.pos.y, canvasHeight - playerHeight / 2)
+                console.log(`Emitting "player-move" event, y: ${this.pos.y}`)
+                socket.emit('player-move', { y: this.pos.y });
             }
-            }
+        }
 
         class Ball{
             constructor()
@@ -97,8 +102,7 @@ export default function PongGame() {
                 player.points++
                 //console.log(player.points)
             }
-            move()
-            {
+            move() {
                 this.pos.x += this.direction * canvasWidth * (p5.deltaTime / 1000)
                 this.pos.y += this.verticalMovement * (p5.deltaTime / 1000)
                 //bounce off players
@@ -124,9 +128,12 @@ export default function PongGame() {
             playerRight = new Player(canvasWidth - playerOffset - playerWidth);
             ball = new Ball();
             console.log('setup called')
-            socket.on('gameState', (gameState) => {
-                playerLeft.pos.y = gameState.playerLeft.y;
-                playerRight.pos.y = gameState.playerRight.y;
+            socket.on('update-game', (gameState) => {
+                console.log("received gameState, left player: ", gameState.players[0].y, ", right player: ", gameState.players[1].y)
+                if (playerIndex === 1)
+                    playerLeft.pos.y = gameState.players[0].y;
+                if (playerIndex === 0)
+                    playerRight.pos.y = gameState.players[1].y;
                 ball.pos.x = gameState.ball.x;
                 ball.pos.y = gameState.ball.y;
             });
@@ -139,20 +146,16 @@ export default function PongGame() {
         };
 
         p5.draw = () => {
-            // Your draw code here.
             p5.background(220);
-            playerLeft.draw();
-            playerRight.draw();
-            ball.draw();
+            playerLeft.draw(playerIndex === 0);
+            playerRight.draw(playerIndex === 1);
+            // ball.draw();
 
-            playerLeft.move(p5.UP_ARROW, p5.DOWN_ARROW);
-            playerRight.move(87, 83);
+            if (playerIndex === 0)
+                playerLeft.move(p5.UP_ARROW, p5.DOWN_ARROW);
+            if (playerIndex === 1)
+                playerRight.move(87, 83);
             ball.move();
-            // Send the current player's direction to the server
-            let direction = 0;
-            if (p5.keyIsDown(p5.UP_ARROW)) direction = -1;
-            if (p5.keyIsDown(p5.DOWN_ARROW)) direction = 1;
-            socket.emit('playerAction', { direction });
         };
 
     };

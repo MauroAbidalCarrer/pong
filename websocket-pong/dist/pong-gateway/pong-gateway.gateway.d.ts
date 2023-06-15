@@ -1,6 +1,7 @@
 import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
 type Player = {
+    socketId: number;
     y: number;
 };
 type GameState = {
@@ -15,12 +16,11 @@ type GameState = {
 export declare class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
     server: Server;
     gameState: GameState;
-    clients: Socket[];
-    handleConnection(client: Socket): void;
-    handleDisconnect(client: Socket): void;
+    clientSockets: Socket[];
+    handleConnection(clientSocket: Socket): void;
+    handleDisconnect(clientSocket: Socket): void;
     startGame(): void;
-    handlePlayerMove(client: Socket, payload: {
-        playerIndex: number;
+    handlePlayerMove(clientSocket: Socket, payload: {
         y: number;
     }): void;
 }

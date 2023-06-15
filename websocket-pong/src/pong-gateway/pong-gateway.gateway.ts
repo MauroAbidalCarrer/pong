@@ -9,6 +9,7 @@ import { Socket, Server } from 'socket.io';
 
 // Define the GameState and Player type
 type Player = {
+  socketId: number
   y: number;
 };
 
@@ -36,42 +37,43 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
       directionY: 0,
     },
     players: [
-      { y: 0 }, // Player 1
-      { y: 0 }, // Player 2
+      { y: 0, socketId: 0 }, // Player 1
+      { y: 0, socketId: 0 }, // Player 2
     ],
   };
 
-  // Client connections list
-  clients: Socket[] = [];
+  // clientSocket connections list
+  clientSockets: Socket[] = [];
 
-  handleConnection(client: Socket) {
-    // When a new client connects, add them to the list of clients
-    this.clients.push(client);
-    console.log('Client connected:', client.id);
+  handleConnection(clientSocket: Socket) {
+    // When a new clientSocket connects, add them to the list of clientSockets
+    this.clientSockets.push(clientSocket);
+    console.log('clientSocket connected:', clientSocket.id);
+    clientSocket.emit('assign-player', this.clientSockets.indexOf(clientSocket));
 
     // If we have two players, start the game
-    if (this.clients.length === 2) {
+    if (this.clientSockets.length === 2) {
       this.startGame();
     }
   }
 
-  handleDisconnect(client: Socket) {
-    console.log('Client disconnected:', client.id);
+  handleDisconnect(clientSocket: Socket) {
+    console.log('clientSocket disconnected:', clientSocket.id);
 
-    // Remove disconnected client from the list of clients
-    this.clients = this.clients.filter((c) => c.id !== client.id);
+    // Remove disconnected clientSocket from the list of clientSockets
+    this.clientSockets = this.clientSockets.filter((c) => c.id !== clientSocket.id);
 
     // Reset the game state
     this.gameState = {
       ball: {
-        x: 0,
-        y: 0,
+        x: 400,
+        y: 300,
         directionX: 1,
         directionY: 0,
       },
       players: [
-        { y: 0 }, // Player 1
-        { y: 0 }, // Player 2
+        { y: 300, socketId: 0 }, // Player 1
+        { y: 300, socketId: 0 }, // Player 2
       ],
     };
   }
@@ -79,24 +81,27 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Method to start the game
   startGame() {
     // Place the ball in the middle
-    this.gameState.ball.x = 400;
-    this.gameState.ball.y = 300;
+    // this.gameState.ball.x = 400;
+    // this.gameState.ball.y = 300;
 
-    // Place the players in initial positions
-    this.gameState.players[0].y = 300;
-    this.gameState.players[1].y = 300;
+    // // Place the players in initial positions
+    // this.gameState.players[0].y = 300;
+    // this.gameState.players[1].y = 300;
 
-    // Send game state to both clients
+    // Send game state to both clientSockets
     this.server.emit('update-game', this.gameState);
   }
 
   // Method to handle player move events
   @SubscribeMessage('player-move')
-  handlePlayerMove(client: Socket, payload: { playerIndex: number; y: number }) {
+  handlePlayerMove(clientSocket: Socket, payload: { y: number }) {
+    //find playerIndex with clientSocket (this way, a player can only affect its paddle)
+    let playerIndex: number = this.clientSockets.findIndex(cs => cs === clientSocket)
     // Update the player's position based on the payload
-    this.gameState.players[payload.playerIndex].y = payload.y;
+    this.gameState.players[playerIndex].y = payload.y;
 
-    // Then emit the updated game state to both clients
+    console.log(`Received player-move event of player ${playerIndex}, p1 pos:${this.gameState.players[0].y}, p2 pos:${this.gameState.players[1].y}, payload.y: ${payload.y}`)
+    // Then emit the updated game state to both clientSockets
     this.server.emit('update-game', this.gameState);
   }
 }

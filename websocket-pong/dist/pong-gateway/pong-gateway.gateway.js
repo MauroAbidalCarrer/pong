@@ -22,44 +22,43 @@ let PongGateway = exports.PongGateway = class PongGateway {
                 directionY: 0,
             },
             players: [
-                { y: 0 },
-                { y: 0 },
+                { y: 0, socketId: 0 },
+                { y: 0, socketId: 0 },
             ],
         };
-        this.clients = [];
+        this.clientSockets = [];
     }
-    handleConnection(client) {
-        this.clients.push(client);
-        console.log('Client connected:', client.id);
-        if (this.clients.length === 2) {
+    handleConnection(clientSocket) {
+        this.clientSockets.push(clientSocket);
+        console.log('clientSocket connected:', clientSocket.id);
+        clientSocket.emit('assign-player', this.clientSockets.indexOf(clientSocket));
+        if (this.clientSockets.length === 2) {
             this.startGame();
         }
     }
-    handleDisconnect(client) {
-        console.log('Client disconnected:', client.id);
-        this.clients = this.clients.filter((c) => c.id !== client.id);
+    handleDisconnect(clientSocket) {
+        console.log('clientSocket disconnected:', clientSocket.id);
+        this.clientSockets = this.clientSockets.filter((c) => c.id !== clientSocket.id);
         this.gameState = {
             ball: {
-                x: 0,
-                y: 0,
+                x: 400,
+                y: 300,
                 directionX: 1,
                 directionY: 0,
             },
             players: [
-                { y: 0 },
-                { y: 0 },
+                { y: 300, socketId: 0 },
+                { y: 300, socketId: 0 },
             ],
         };
     }
     startGame() {
-        this.gameState.ball.x = 400;
-        this.gameState.ball.y = 300;
-        this.gameState.players[0].y = 300;
-        this.gameState.players[1].y = 300;
         this.server.emit('update-game', this.gameState);
     }
-    handlePlayerMove(client, payload) {
-        this.gameState.players[payload.playerIndex].y = payload.y;
+    handlePlayerMove(clientSocket, payload) {
+        let playerIndex = this.clientSockets.findIndex(cs => cs === clientSocket);
+        this.gameState.players[playerIndex].y = payload.y;
+        console.log(`Received player-move event of player ${playerIndex}, p1 pos:${this.gameState.players[0].y}, p2 pos:${this.gameState.players[1].y}, payload.y: ${payload.y}`);
         this.server.emit('update-game', this.gameState);
     }
 };
