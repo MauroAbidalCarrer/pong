@@ -3,17 +3,19 @@ import { ReactP5Wrapper } from "@p5-wrapper/react";
 import io from 'socket.io-client'; // Import the socket.io client
 
 export default function PongGame() { 
+    //possible states: undefined(didn't try anything), in queue, Connection failed, Connection timeout, VICTORY, DEFEAT
+    const [ sessionState, setsessionState ] = useState(undefined)
     const [socket, setSocket] = useState(null); // Store the socket connection
-    const [connectionStatus, setConnectionStatus] = useState('Connecting...'); // Store connection status
+    // const [connectionStatus, setConnectionStatus] = useState('Connecting...'); // Store connection status
     const [playerIndex, setPlayerIndex] = useState(null); // Store the player index, 0 = left, 1 = right
 
     // Connect to the socket server on component mount
     useEffect(() => {
         const newSocket = io.connect('http://localhost:8080'); // Replace with your server address
 
-        newSocket.on('connect', () => setConnectionStatus('Connected'));
-        newSocket.on('connect_error', () => setConnectionStatus('Connection failed'));
-        newSocket.on('connect_timeout', () => setConnectionStatus('Connection timeout'));
+        newSocket.on('connect', () => setsessionState('Connected'));
+        newSocket.on('connect_error', () => setsessionState('Connection failed'));
+        newSocket.on('connect_timeout', () => setsessionState('Connection timeout'));
         newSocket.on('assign-player', (playerIndex) => setPlayerIndex(playerIndex));
 
         setSocket(newSocket);
@@ -123,32 +125,35 @@ export default function PongGame() {
             p5.fill('black')
             p5.text(playerLeft.points.toString(), canvasWidth / 5, canvasHeight / 6)
             p5.text(playerRight.points.toString(), canvasWidth - canvasWidth / 5, canvasHeight / 6)
-
-            console.log("Draw called")
         }
         function drawEndMenu() {
             p5.clear()
             p5.textSize(150);
-            if ((playerLeft.won && playerIndex === 0) || (playerRight.won && playerIndex === 1)) {
+            if (sessionState === "VICTORY") {
                 p5.fill('yellow')
                 p5.text("VICTORY!", canvasWidth / 5, canvasHeight / 6)
             }
-            else if ((playerLeft.won && playerIndex === 1) || (playerRight.won && playerIndex === 0)) {
+            else {
                 p5.fill('gray')
                 p5.text("DEFEAT!", canvasWidth / 10, canvasHeight / 10, canvasWidth * 0.9 , canvasHeight * 0.9)
             }
         }
         p5.draw = () => {
-            if (playerLeft.points >= 3 || playerRight.points >= 3)
+            if (sessionState !== undefined)
                 drawEndMenu()
-            else
+            else {
+                if ((playerLeft.won && playerIndex === 0) || (playerRight.won && playerIndex === 1)) 
+                    setsessionState("VICTORY")
+                if ((playerLeft.won && playerIndex === 1) || (playerRight.won && playerIndex === 0)) 
+                    setsessionState("DEFEAT")
                 drawGame()
+            }
         };
 
     };
 
     return (
-        connectionStatus === 'Connected'
+        sessionState === 'Connected' || sessionState === "VICTORY" || sessionState === "DEFEAT"
             ? <ReactP5Wrapper sketch={sketch} />
             : <p>{connectionStatus}</p>
     );

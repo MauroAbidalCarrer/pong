@@ -46,6 +46,7 @@ class Ball {
     givepointToPlayer(player) {
         this.pos = new simpleMath_1.Vector2D(canvasWidth / 2, canvasHeight / 2);
         player.points++;
+        player.won = player.points >= 3;
     }
     move(gameState) {
         this.pos.x += this.horizontalMovement * canvasWidth * deltaTime;
@@ -79,25 +80,40 @@ let PongGateway = exports.PongGateway = class PongGateway {
     }
     handleConnection(clientSocket) {
         this.clientSockets.push(clientSocket);
-        console.log('clientSocket connected:', clientSocket.id);
-        clientSocket.emit('assign-player', this.clientSockets.indexOf(clientSocket));
         if (this.clientSockets.length === 2) {
+            this.clientSockets.forEach((cs, index) => cs.emit('assign-player', index));
             this.startGame();
         }
     }
     handleDisconnect(clientSocket) {
-        console.log('clientSocket disconnected:', clientSocket.id);
         if (this.clientSockets.length === 2 && !this.gameState.players.some(player => player.won)) {
             let disconnectedPlayerIndex = this.clientSockets.findIndex(cs => clientSocket === cs);
             this.gameState.players[1 - disconnectedPlayerIndex].won = true;
         }
         this.clientSockets = this.clientSockets.filter((c) => c.id !== clientSocket.id);
+        this.gameState = {
+            ball: new Ball(),
+            players: [
+                { y: 0, socketId: 0, points: 0, won: false },
+                { y: 0, socketId: 0, points: 0, won: false },
+            ],
+        };
     }
     startGame() {
         this.server.emit('update-game', this.gameState);
         setInterval(() => {
             this.gameState.ball.move(this.gameState);
             this.server.emit('update-game', this.gameState);
+            if (this.gameState.players.some(player => player.won)) {
+                this.clientSockets.forEach(cs => cs.disconnect(true));
+                this.gameState = {
+                    ball: new Ball(),
+                    players: [
+                        { y: 0, socketId: 0, points: 0, won: false },
+                        { y: 0, socketId: 0, points: 0, won: false },
+                    ],
+                };
+            }
         }, interval);
     }
     handlePlayerMove(clientSocket, payload) {
