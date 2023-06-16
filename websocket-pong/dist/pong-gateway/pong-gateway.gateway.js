@@ -12,126 +12,47 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PongGateway = void 0;
 const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
-const simpleMath_1 = require("./simpleMath");
-const canvasWidth = 800;
-const canvasHeight = 600;
-const playerWidth = 30;
-const playerOffset = 10;
-const playerHeight = 100;
-const leftPlayerX = playerOffset + playerWidth;
-const rightPlayerX = canvasWidth - playerOffset - playerWidth;
-const ballRadius = 15;
+const gameSession_1 = require("./gameSession");
 const interval = 1000 / 30;
-const deltaTime = 1 / 30;
-class Ball {
-    constructor() {
-        this.pos = new simpleMath_1.Vector2D(0, 0);
-        this.horizontalMovement = 1;
-        this.verticalMovement = 0;
-    }
-    checkOverlap(playerPos) {
-        let closestX = (0, simpleMath_1.clamp)(this.pos.x - playerPos.x, -playerWidth / 2, playerWidth / 2) + playerPos.x;
-        let closestY = (0, simpleMath_1.clamp)(this.pos.y - playerPos.y, -playerHeight / 2, playerHeight / 2) + playerPos.y;
-        var distanceX = this.pos.x - closestX;
-        var distanceY = this.pos.y - closestY;
-        var distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
-        return distanceSquared <= (ballRadius * ballRadius);
-    }
-    bounceOffPlayer(playerPos) {
-        let dir = new simpleMath_1.Vector2D(this.pos.x - playerPos.x, this.pos.y - playerPos.y);
-        dir.normalize();
-        this.horizontalMovement *= -1;
-        this.verticalMovement = dir.y * 90;
-    }
-    givepointToPlayer(player) {
-        this.pos = new simpleMath_1.Vector2D(canvasWidth / 2, canvasHeight / 2);
-        player.points++;
-        player.won = player.points >= 3;
-    }
-    move(gameState) {
-        this.pos.x += this.horizontalMovement * canvasWidth * deltaTime;
-        this.pos.y += this.verticalMovement * deltaTime;
-        let leftPlayerPos = new simpleMath_1.Vector2D(leftPlayerX, gameState.players[0].y);
-        if (this.checkOverlap(leftPlayerPos) && this.horizontalMovement === -1)
-            this.bounceOffPlayer(leftPlayerPos);
-        let rightPlayerPos = new simpleMath_1.Vector2D(rightPlayerX, gameState.players[1].y);
-        if (this.checkOverlap(rightPlayerPos) && this.horizontalMovement === 1)
-            this.bounceOffPlayer(rightPlayerPos);
-        if (this.pos.y > canvasHeight - ballRadius || this.pos.y < ballRadius)
-            this.verticalMovement *= -1;
-        if (this.pos.x > canvasWidth - ballRadius) {
-            this.givepointToPlayer(gameState.players[0]);
-        }
-        if (this.pos.x < ballRadius) {
-            this.givepointToPlayer(gameState.players[1]);
-        }
-    }
-}
 let PongGateway = exports.PongGateway = class PongGateway {
     constructor() {
-        this.gameState = {
-            ball: new Ball(),
-            players: [
-                { y: 0, socketId: 0, points: 0, won: false },
-                { y: 0, socketId: 0, points: 0, won: false },
-            ],
-        };
-        this.clientSockets = [];
+        this.clientSocketsQueue = [];
+        this.gameSessions = [];
+        this.nextDebugSessionId = 0;
+        setInterval(() => this.update(), interval);
     }
     handleConnection(clientSocket) {
-        this.clientSockets.push(clientSocket);
-        if (this.clientSockets.length === 2) {
-            this.clientSockets.forEach((cs, index) => cs.emit('assign-player', index));
-            this.startGame();
+        this.clientSocketsQueue.push(clientSocket);
+        if (this.clientSocketsQueue.length >= 2) {
+            let clientSocket1 = this.clientSocketsQueue.pop();
+            let clientSocket2 = this.clientSocketsQueue.pop();
+            console.log(`Creating game session ${this.nextDebugSessionId}`);
+            this.gameSessions.push(new gameSession_1.GameSession(clientSocket1, clientSocket2, this.nextDebugSessionId));
+            this.nextDebugSessionId += 1;
+            console.log(`Client CONNECTED, sessions count: ${this.gameSessions.length}, [${this.gameSessions.map(session => session.debugId)}]`);
+        }
+        else {
+            console.log(`Client CONNECTED, added to queue, queue.length = ${this.clientSocketsQueue.length}`);
+            clientSocket.emit('in-queue');
         }
     }
-    handleDisconnect(clientSocket) {
-        if (this.clientSockets.length === 2 && !this.gameState.players.some(player => player.won)) {
-            let disconnectedPlayerIndex = this.clientSockets.findIndex(cs => clientSocket === cs);
-            this.gameState.players[1 - disconnectedPlayerIndex].won = true;
-        }
-        this.clientSockets = this.clientSockets.filter((c) => c.id !== clientSocket.id);
-        this.gameState = {
-            ball: new Ball(),
-            players: [
-                { y: 0, socketId: 0, points: 0, won: false },
-                { y: 0, socketId: 0, points: 0, won: false },
-            ],
-        };
+    handleDisconnect(clientScoket) {
+        this.clientSocketsQueue = this.clientSocketsQueue.filter(cs => cs !== clientScoket);
+        console.log(`Client DISCONNECTED, sessions count: ${this.gameSessions.length}, [${this.gameSessions.map(session => session.debugId)}]`);
     }
-    startGame() {
-        this.server.emit('update-game', this.gameState);
-        setInterval(() => {
-            this.gameState.ball.move(this.gameState);
-            this.server.emit('update-game', this.gameState);
-            if (this.gameState.players.some(player => player.won)) {
-                this.clientSockets.forEach(cs => cs.disconnect(true));
-                this.gameState = {
-                    ball: new Ball(),
-                    players: [
-                        { y: 0, socketId: 0, points: 0, won: false },
-                        { y: 0, socketId: 0, points: 0, won: false },
-                    ],
-                };
-            }
-        }, interval);
-    }
-    handlePlayerMove(clientSocket, payload) {
-        let playerIndex = this.clientSockets.findIndex(cs => cs === clientSocket);
-        this.gameState.players[playerIndex].y = payload.y;
+    update() {
+        this.gameSessions = this.gameSessions.filter(session => {
+            session.update();
+            return session.gameIsOver === false;
+        });
     }
 };
 __decorate([
     (0, websockets_1.WebSocketServer)(),
     __metadata("design:type", socket_io_1.Server)
 ], PongGateway.prototype, "server", void 0);
-__decorate([
-    (0, websockets_1.SubscribeMessage)('player-move'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
-    __metadata("design:returntype", void 0)
-], PongGateway.prototype, "handlePlayerMove", null);
 exports.PongGateway = PongGateway = __decorate([
-    (0, websockets_1.WebSocketGateway)(8080)
+    (0, websockets_1.WebSocketGateway)(8080),
+    __metadata("design:paramtypes", [])
 ], PongGateway);
 //# sourceMappingURL=pong-gateway.gateway.js.map

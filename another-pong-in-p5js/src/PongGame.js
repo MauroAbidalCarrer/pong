@@ -3,24 +3,33 @@ import { ReactP5Wrapper } from "@p5-wrapper/react";
 import io from 'socket.io-client'; // Import the socket.io client
 
 export default function PongGame() { 
-    //possible states: undefined(didn't try anything), in queue, Connection failed, Connection timeout, VICTORY, DEFEAT
+    //possible states: undefined(didn't try anything), in queue, in game, Connection failed, Connection timeout, VICTORY, DEFEAT
     const [ sessionState, setsessionState ] = useState(undefined)
     const [socket, setSocket] = useState(null); // Store the socket connection
-    // const [connectionStatus, setConnectionStatus] = useState('Connecting...'); // Store connection status
     const [playerIndex, setPlayerIndex] = useState(null); // Store the player index, 0 = left, 1 = right
 
     // Connect to the socket server on component mount
     useEffect(() => {
-        const newSocket = io.connect('http://localhost:8080'); // Replace with your server address
+        if (!socket) {
+            const newSocket = io.connect('http://localhost:8080'); // Replace with your server address
 
-        newSocket.on('connect', () => setsessionState('Connected'));
-        newSocket.on('connect_error', () => setsessionState('Connection failed'));
-        newSocket.on('connect_timeout', () => setsessionState('Connection timeout'));
-        newSocket.on('assign-player', (playerIndex) => setPlayerIndex(playerIndex));
+            newSocket.on('connect', () => setsessionState('connected'));
+            newSocket.on('in-queue', () => setsessionState('in-queue'));
+            newSocket.on('start-game', (playerIndex) => {
+                setsessionState('in-game')
+                setPlayerIndex(playerIndex)
+            });
+            newSocket.on('connect_error', () => setsessionState('connection-failed'));
+            newSocket.on('connect_timeout', () => setsessionState('connection-timeout'));
+            setSocket(newSocket);
 
-        setSocket(newSocket);
-        return () => newSocket.close(); // Disconnect on unmount
-    }, []);
+            console.log("Created new socket")
+        }
+
+        return () => {
+            // console.log("closing connection")
+        }
+    }, [playerIndex, socket]);
 
     const sketch = p5 => {
         const canvasWidth = 800;
@@ -39,7 +48,6 @@ export default function PongGame() {
             {
                 this.pos = p5.createVector(x, canvasHeight / 2)
                 this.points = 0
-                this.won = false
             }
             
             draw(isLocal)
@@ -71,9 +79,6 @@ export default function PongGame() {
             constructor()
             {
                 this.pos = p5.createVector(canvasWidth / 2, canvasHeight / 2)
-                //left(1) or right(2)
-                // this.horizontalMovement = 1
-                // this.verticalMovement = 0
             }
             draw()
             {
@@ -99,15 +104,14 @@ export default function PongGame() {
                 ball.pos.y = gameState.ball.pos.y;
                 playerLeft.points = gameState.players[0].points
                 playerRight.points = gameState.players[1].points
-                playerRight.won = gameState.players[0].won
-                playerLeft.won = gameState.players[1].won
             });
-
-            // When a point is scored, update the players' scores
-            socket.on('score', (scores) => {
-                playerLeft.points = scores.left;
-                playerRight.points = scores.right;
-            });
+            socket.on('game-over', outcome => {
+                console.log("received 'game-over' event, won: ", outcome.won, ", reason: ", outcome.reason)
+                if (outcome.won)
+                    setsessionState("VICTORY")
+                else
+                    setsessionState("DEFEAT")
+            })
         };
 
         function drawGame() {
@@ -118,8 +122,8 @@ export default function PongGame() {
  
             if (playerIndex === 0)
                 playerLeft.move(p5.UP_ARROW, p5.DOWN_ARROW);
-            if (playerIndex === 1)
-                playerRight.move(87, 83);
+            else
+                playerRight.move(p5.UP_ARROW, p5.DOWN_ARROW);
 
             p5.textSize(32);
             p5.fill('black')
@@ -127,34 +131,28 @@ export default function PongGame() {
             p5.text(playerRight.points.toString(), canvasWidth - canvasWidth / 5, canvasHeight / 6)
         }
         function drawEndMenu() {
+            // console.log(`in draw menuL "VICTORY" === sessionState: `, "VICTORY" === sessionState)
             p5.clear()
             p5.textSize(150);
-            if (sessionState === "VICTORY") {
+            if (sessionState === "VICTORY") 
                 p5.fill('yellow')
-                p5.text("VICTORY!", canvasWidth / 5, canvasHeight / 6)
-            }
-            else {
+            else 
                 p5.fill('gray')
-                p5.text("DEFEAT!", canvasWidth / 10, canvasHeight / 10, canvasWidth * 0.9 , canvasHeight * 0.9)
-            }
+            p5.text(sessionState + "!", canvasWidth / 10, canvasHeight / 10, canvasWidth * 0.9 , canvasHeight * 0.9)
+            // console.log("Printed outcome text")
         }
         p5.draw = () => {
-            if (sessionState !== undefined)
+            if (sessionState === "VICTORY" || sessionState === "DEFEAT")
                 drawEndMenu()
-            else {
-                if ((playerLeft.won && playerIndex === 0) || (playerRight.won && playerIndex === 1)) 
-                    setsessionState("VICTORY")
-                if ((playerLeft.won && playerIndex === 1) || (playerRight.won && playerIndex === 0)) 
-                    setsessionState("DEFEAT")
+            else
                 drawGame()
-            }
         };
 
     };
 
     return (
-        sessionState === 'Connected' || sessionState === "VICTORY" || sessionState === "DEFEAT"
+        sessionState === 'in-game' || sessionState === "VICTORY" || sessionState === "DEFEAT"
             ? <ReactP5Wrapper sketch={sketch} />
-            : <p>{connectionStatus}</p>
+            : <p>{sessionState}</p>
     );
 }
