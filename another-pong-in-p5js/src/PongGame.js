@@ -93,7 +93,7 @@ export default function PongGame() {
             playerLeft = new Player(playerOffset + playerWidth);
             playerRight = new Player(canvasWidth - playerOffset - playerWidth);
             ball = new Ball();
-            // console.log('setup called')
+            console.log('setup called, socket: ', socket)
             socket.on('update-game', (gameState) => {
                 // console.log("received gameState, left player: ", gameState.players[0].y, ", right player: ", gameState.players[1].y)
                 if (playerIndex === 1)
@@ -115,7 +115,6 @@ export default function PongGame() {
         };
 
         function drawGame() {
-            p5.background(220);
             playerLeft.draw(playerIndex === 0);
             playerRight.draw(playerIndex === 1);
             ball.draw();
@@ -131,28 +130,25 @@ export default function PongGame() {
             p5.text(playerRight.points.toString(), canvasWidth - canvasWidth / 5, canvasHeight / 6)
         }
         function drawEndMenu() {
-            // console.log(`in draw menuL "VICTORY" === sessionState: `, "VICTORY" === sessionState)
             p5.clear()
             p5.textSize(150);
             if (sessionState === "VICTORY") 
                 p5.fill('yellow')
             else 
                 p5.fill('gray')
-            p5.text(sessionState + "!", canvasWidth / 10, canvasHeight / 10, canvasWidth * 0.9 , canvasHeight * 0.9)
-            // console.log("Printed outcome text")
+            p5.text(sessionState, canvasWidth / 10, canvasHeight / 10, canvasWidth * 0.9 , canvasHeight * 0.9)
         }
         p5.draw = () => {
-            if (sessionState === "VICTORY" || sessionState === "DEFEAT")
-                drawEndMenu()
-            else
+            p5.background(220);
+            if (sessionState === 'in-game')
                 drawGame()
+            else
+                drawEndMenu()
         };
 
     };
-
+ 
     return (
-        sessionState === 'in-game' || sessionState === "VICTORY" || sessionState === "DEFEAT"
-            ? <ReactP5Wrapper sketch={sketch} />
-            : <p>{sessionState}</p>
+        <ReactP5Wrapper sketch={sketch} />
     );
 }

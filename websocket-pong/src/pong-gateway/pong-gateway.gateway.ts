@@ -32,10 +32,10 @@ export class PongGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (this.clientSocketsQueue.length >= 2) {
       let clientSocket1 = this.clientSocketsQueue.pop()
       let clientSocket2 = this.clientSocketsQueue.pop()
-      console.log(`Creating game session ${this.nextDebugSessionId}`)
+      console.log(`Client CONNECTED, creating game session ${this.nextDebugSessionId}`)
       this.gameSessions.push(new GameSession(clientSocket1, clientSocket2, this.nextDebugSessionId))
       this.nextDebugSessionId += 1
-      console.log(`Client CONNECTED, sessions count: ${this.gameSessions.length}, [${this.gameSessions.map(session => session.debugId)}]`)
+      console.log(`Sessions count: ${this.gameSessions.length}, [${this.gameSessions.map(session => session.debugId)}]`)
     }
     else{
       console.log(`Client CONNECTED, added to queue, queue.length = ${this.clientSocketsQueue.length}`)

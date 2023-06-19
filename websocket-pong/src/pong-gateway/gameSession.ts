@@ -24,19 +24,19 @@ const ballDeltaX = canvasWidth * deltaTime
 
 // Define the GameState and Player type
 type Player = {
-  socketId: number
   y: number
   points: number
 };
 
 type GameState = {
+  nbFramesDebug: number
   ball: Ball
   players: [Player, Player];
 };
 
 
 class Ball{
-  pos: Vector2D = new Vector2D(canvasHeight / 2, canvasWidth / 2)
+  pos: Vector2D = new Vector2D(canvasWidth / 2, canvasHeight / 2)
   horizontalMovement: number = 1
   verticalMovement: number = 0
   checkOverlap(playerPos: Vector2D): boolean {
@@ -50,9 +50,8 @@ class Ball{
       // Check if the distance is less than the circle's radius squared
       return distanceSquared <= (ballRadius * ballRadius);
   }
-  bounceOffPlayer(playerPos: Vector2D) {
+  bounceOffPlayer(playerPos: Vector2D) { 
       let dir = new Vector2D(this.pos.x - playerPos.x, this.pos.y - playerPos.y);
-      
       dir.normalize();
       this.horizontalMovement *= -1;
       this.verticalMovement = dir.y * 90;
@@ -62,7 +61,6 @@ class Ball{
     player.points++
   }
   move(gameState: GameState) {
-    // console.log(`deltaX: ${this.horizontalMovement * canvasWidth * deltaTime}, ball.pos.x: ${this.pos.x}`)
     this.pos.x += this.horizontalMovement * ballDeltaX
     this.pos.y += this.verticalMovement * deltaTime
     //bounce off players
@@ -75,10 +73,10 @@ class Ball{
     //bounce off walls
     if (this.pos.y > canvasHeight - ballRadius || this.pos.y < ballRadius)
       this.verticalMovement *= -1
-    if (this.pos.x > canvasWidth - ballRadius) 
+    if (this.pos.x > canvasWidth - ballRadius)
       this.givepointToPlayer(gameState.players[0])
-    if (this.pos.x < ballRadius) 
-      this.givepointToPlayer(gameState.players[1])
+    if (this.pos.x < ballRadius)
+      this.givepointToPlayer(gameState.players[1]) 
   }
 }
 
@@ -86,10 +84,11 @@ export class GameSession {
 
   // Initial game state
   gameState: GameState = {
+    nbFramesDebug: 0,
     ball: new Ball(),
     players: [
-      { y: 0, socketId: 0, points: 0 }, // Player 1
-      { y: 0, socketId: 0, points: 0 }, // Player 2
+      { y: canvasHeight / 2, points: 0 }, // Player 1
+      { y: canvasHeight / 2, points: 0 }, // Player 2
     ],
   };
 
@@ -101,7 +100,6 @@ export class GameSession {
   debugId: number = -1
 
   constructor(clientSocket1: Socket, clientSocket2: Socket, debugId: number) {
-    // console.log(`debugId: ${debugId}`)
     this.debugId = debugId
     this.clientSockets = [clientSocket1, clientSocket2]
     this.clientSockets.forEach((cs, index) => cs.emit('start-game', index))
@@ -109,23 +107,22 @@ export class GameSession {
     this.clientSockets.forEach(cs => cs.on('disconnect', () => this.handleDisconnect(cs)))
     this.clientSockets.forEach(cs => cs.on('player-move', (payload) => this.handlePlayerMove(cs, payload)))
   }
-
+ 
   handleDisconnect(disconnectedClientSocket: Socket) {
     if (this.gameIsOver === false) {
       //find the index of the player that left
       let winnerSocket: Socket = this.clientSockets.find(cs => cs !== disconnectedClientSocket)
       //give the win to the player that remained
-      console.log("Game is over: a player left the game")
+      console.log(`Game ${this.debugId} is over: a player left the game`)
       winnerSocket.emit('game-over', {won: true, reason: "Other player disconnected."})
       this.gameIsOver = true
     } 
   }
   update()  {
-    // console.log(`updating game session, playerLeft: ${this.gameState.players[0]}, playerRightt: ${this.gameState.players[1]}`)
     this.gameState.ball.move(this.gameState)
     let WinnerIndex = this.gameState.players.findIndex(player => player.points >= 3)
     if (WinnerIndex !== -1) {
-      console.log(`Game is over: player ${WinnerIndex} has ${this.gameState.players[WinnerIndex].points} points.`)
+      console.log(`Game ${this.debugId} is over: player ${WinnerIndex} has ${this.gameState.players[WinnerIndex].points} points.`)
       this.clientSockets[WinnerIndex].emit('game-over', {won: true, reason: "You have 3 or more points."})
       this.clientSockets[1 - WinnerIndex].emit('game-over', {won: false, reason: "Other player has 3 or more points."})
       //Set gameIsOver to true before disconnecting the clients because handleDisconnect(which rellis on gameIsOver) will get called/
@@ -134,6 +131,7 @@ export class GameSession {
     }
     else
       this.clientSockets.forEach(cs => cs.emit('update-game', this.gameState));
+    this.gameState.nbFramesDebug++
   }
 
   // Method to handle player move events

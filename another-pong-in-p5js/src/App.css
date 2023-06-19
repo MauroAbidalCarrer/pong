@@ -37,6 +37,7 @@
   }
 }
 
-.p5Canvas {
+.canvas {
   align-self: center;
+  border: 2px solid #000000; /* This adds a 2 pixel solid black border */
 }
